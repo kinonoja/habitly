@@ -1,28 +1,48 @@
 # Habitly
 
-Habitly is a frontend-only habit tracking product prototype built around a considered journal aesthetic: warm paper tones, measured editorial typography, and a quiet, legible calendar. It demonstrates a personal workspace and a separate, explicitly unprotected admin preview.
+Habitly is a React habit-tracking prototype with a journal-inspired interface. Normal startup opens an empty local workspace with no profile identity. Habits and completion edits are held by an in-memory repository and reset on reload; only the theme preference is persisted in `localStorage`. The profile, preferences, and repository interfaces are architecture contracts, not connected persistence features.
 
-## Stack
+The `/admin` route is an unprotected development preview populated with illustrative users, metrics, and activity; production builds redirect away from it. Do not use it with real user data. Open the populated personal demo explicitly with `/?preview=demo` in development. Demo content is not real user activity and is never used to initialize the normal workspace.
 
-- React and TypeScript (strict mode)
+## Current stack
+
+- React 19 and strict TypeScript
 - Vite
-- Tailwind CSS 4 via the official `@tailwindcss/vite` plugin
+- Tailwind CSS v4 via `@tailwindcss/vite`
 - React Router
 - Lucide React
 - Vitest and React Testing Library
 - ESLint with TypeScript and React Hooks rules
 
-## Requirements
-
-- Node.js 20.19+ (or 22.12+); the current Vite release may require these minimums
-- npm 10+
+The current repository has no authentication, Supabase client, database, backend, IndexedDB storage, offline support, or synchronization engine. No Supabase service-role credential may ever be shipped to the browser.
 
 ## Run locally
+
+Requirements: Node.js 20.19+ (or 22.12+) and npm 10+.
 
 ```sh
 npm install
 npm run dev
 ```
+
+## Project structure today
+
+```text
+src/
+  app/                 App composition, React Router, workspace provider
+  components/          Shared UI and application shell
+  domain/              Ownership-aware models, validation, repository contracts, date rules
+  application/         Workspace actions/use cases
+  features/            Overview, habits, tracker, analytics, settings, admin preview
+  infrastructure/      In-memory repositories and browser theme preference adapter
+  preview/              Explicit development-only demo workspace
+  styles/              Shared styles
+  test/                Vitest setup
+```
+
+The provider composes `WorkspaceActions` with repository contracts and an in-memory adapter. Feature UI uses the provider's application actions; it does not access a storage implementation directly. Domain models carry owner identifiers, UTC timestamps, and revisions; calendar dates are separate local date keys. The development demo is loaded through a separate preview entry. No IndexedDB, Supabase adapter, authentication, autosave, cloud synchronization, or offline shell is implemented yet.
+
+Tests cover empty normal startup, explicit demo preview, application-level ownership checks, domain validation, in-memory repository behavior, calendar utilities, navigation, and theme preference behavior.
 
 ## Commands
 
@@ -33,31 +53,8 @@ npm test           # Vitest suite
 npm run build      # Typecheck and production bundle
 ```
 
-## Project structure
+## Target architecture and roadmap
 
-```text
-src/
-  app/                 Router, application entry and providers
-  components/          Shared UI and application shell
-  domain/              Habit types, date rules and representative demo data
-  features/            Overview, habits, tracker, analytics, settings and admin
-  styles/              Semantic design tokens and responsive component styles
-  test/                Test environment setup
-```
+The production direction is an offline-first, multi-user application that preserves React 19, TypeScript, Vite, Tailwind CSS v4, and React Router. Supabase will provide authentication and cloud persistence; IndexedDB will provide durable local data and an outbox for offline writes. The browser will never be trusted to assert user ownership or administrator status. Supabase Row Level Security and trusted server-side authorization must enforce access.
 
-Habit and tracking calculations live in domain modules. React components consume an in-memory frontend provider, which is the clean seam for adding a persistence service later.
-
-## Phase 1 boundaries
-
-- All sample profile, habit, entry, platform user and activity data is representative demo data.
-- Habit edits and progress updates exist in application memory only and disappear on reload.
-- Theme preference is the only preference saved in this browser (`localStorage`).
-- Profile/timezone/preferences and notification controls are visual previews. No notifications are sent.
-- The admin screen is an unprotected demonstration. It grants no real privilege and must not be used with real user data.
-- There is no authentication, Supabase integration, API, server-side logic, or database in this phase.
-- MotionSites catalog searches returned metadata, but its content tools were unauthorized in this environment. No inaccessible reference content or source code was used.
-
-## Planned next phases
-
-1. Phase 2: introduce Supabase authentication and PostgreSQL persistence behind the current frontend domain seam, open registration, trusted administrator role checks, and Row Level Security policies.
-2. Later phases: reminders and notification delivery, account-level settings synchronization, operational monitoring, and deployment after a separate review.
+The future feature-based structure, entity model, ownership policies, synchronization lifecycle, seven delivery phases, and acceptance criteria are documented in [ROADMAP.md](ROADMAP.md). These are plans, not implemented features. This phase added no dependencies and did not implement authentication, database migrations, Supabase, IndexedDB, or synchronization.

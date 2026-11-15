@@ -1,13 +1,16 @@
 import { createContext, useContext } from 'react';
-import type { DateKey, Habit, HabitEntry, ThemePreference } from '../../domain/habits/types';
+import type { DateKey, Habit, HabitCompletion, HabitDraft, ThemePreference, UserId, UserProfile } from '../../domain/habits/types';
 
 export interface HabitlyContextValue {
   theme: ThemePreference;
   setTheme: (theme: ThemePreference) => void;
+  ownerId: UserId;
+  profile?: UserProfile;
+  isDemoPreview: boolean;
   habits: Habit[];
-  entries: HabitEntry[];
-  addHabit: (habit: Habit) => void;
-  updateHabit: (habit: Habit) => void;
+  entries: HabitCompletion[];
+  addHabit: (habit: HabitDraft) => void;
+  updateHabit: (habit: HabitDraft) => void;
   setHabitStatus: (id: string, status: Habit['status']) => void;
   recordProgress: (habit: Habit, value?: number) => void;
   recordAtDate: (habit: Habit, date: DateKey, value: number | boolean) => void;

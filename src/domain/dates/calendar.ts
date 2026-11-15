@@ -43,21 +43,22 @@ export function shiftMonth(year: number, monthIndex: number, amount: number): { 
   return { year: next.getFullYear(), monthIndex: next.getMonth() };
 }
 
-export function weeklyScheduleDays(timesPerWeek: number): number[] {
-  const frequency = Math.min(7, Math.max(1, Math.floor(timesPerWeek)));
-  const patterns: Record<number, number[]> = {
-    1: [3], 2: [2, 5], 3: [1, 3, 5], 4: [1, 2, 4, 6],
-    5: [1, 2, 3, 5, 6], 6: [1, 2, 3, 4, 5, 6], 7: [0, 1, 2, 3, 4, 5, 6],
-  };
-  return patterns[frequency] ?? patterns[3]!;
+export function isoWeekday(date: Date): number {
+  return date.getDay() || 7;
+}
+
+export function calendarWeekStart(key: DateKey): DateKey {
+  const date = parseDateKey(key);
+  date.setDate(date.getDate() - isoWeekday(date) + 1);
+  return toDateKey(date);
 }
 
 export function isHabitScheduled(habit: Habit, key: DateKey): boolean {
   if (habit.status !== 'active' || key < habit.startDate || (habit.endDate && key > habit.endDate)) return false;
   const date = parseDateKey(key);
   if (habit.schedule.type === 'daily') return true;
-  if (habit.schedule.type === 'weekdays') return habit.schedule.days.includes(date.getDay());
-  return weeklyScheduleDays(habit.schedule.timesPerWeek).includes(date.getDay());
+  if (habit.schedule.type === 'weekdays') return habit.schedule.days.includes(isoWeekday(date));
+  return true;
 }
 
 export function isExpectedCompletion(habit: Habit, key: DateKey, today: DateKey = toDateKey(new Date())): boolean {

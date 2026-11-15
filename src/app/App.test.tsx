@@ -12,10 +12,27 @@ describe('Habitly frontend', () => {
 
   it('renders the overview and navigates to the monthly tracker', async () => {
     render(<App />);
-    expect(screen.getByRole('heading', { name: /good (morning|afternoon|evening), alex/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /good (morning|afternoon|evening)\./i })).toBeInTheDocument();
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('link', { name: /monthly tracker/i }));
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Monthly tracker' })).toBeInTheDocument());
     expect(screen.getByRole('table', { name: /monthly habit tracker/i })).toBeInTheDocument();
+  });
+
+  it('starts with an empty normal workspace and no demo profile', async () => {
+    render(<App />);
+    expect(screen.getByRole('button', { name: 'Local workspace' })).toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('link', { name: /my habits/i }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'No active habits yet' })).toBeInTheDocument());
+    expect(screen.queryByText('Read a little')).not.toBeInTheDocument();
+    expect(screen.queryByText('Alex Morgan')).not.toBeInTheDocument();
+  });
+
+  it('loads demo fixtures only in the explicit development preview', async () => {
+    window.history.replaceState({}, '', '/?preview=demo');
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole('heading', { name: /good (morning|afternoon|evening), alex/i })).toBeInTheDocument());
+    expect(screen.getByText('Read a little')).toBeInTheDocument();
+    expect(screen.getByText('Demo data')).toBeInTheDocument();
   });
 
   it('switches and persists the selected theme', async () => {
@@ -26,6 +43,14 @@ describe('Habitly frontend', () => {
     fireEvent.click(screen.getByRole('link', { name: /settings/i }));
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument());
     expect(screen.getByRole('button', { name: /evening ink/i })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('shows an honest empty analytics state without zeroed fake metrics', async () => {
+    render(<App />);
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('link', { name: /insights/i }));
+    await waitFor(() => expect(screen.getByText(/once you add a habit and record progress/i)).toBeInTheDocument());
+    expect(screen.queryByText(/consistency this month/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/current best streak/i)).not.toBeInTheDocument();
   });
 
   it('renders a clearly identified admin preview and its user table', async () => {

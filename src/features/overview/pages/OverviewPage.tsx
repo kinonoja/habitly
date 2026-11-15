@@ -1,26 +1,33 @@
 import { ArrowRight, ArrowUpRight, Check, ChevronRight, Circle, Clock3, Plus, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { demoProfile } from '../../../domain/habits/demo';
 import { getEntryProgress, isHabitScheduled, toDateKey } from '../../../domain/dates/calendar';
 import { useHabitly } from '../../../app/providers/HabitlyContext';
 import { PageIntro } from '../../../components/ui/PageIntro';
 
 export function OverviewPage() {
-  const { habits, entries, recordProgress } = useHabitly();
-  const today = toDateKey(new Date());
-  const dayHabits = habits.filter(h => isHabitScheduled(h, today));
-  const complete = dayHabits.filter(h => getEntryProgress(h, entries.find(e => e.habitId === h.id && e.date === today)) === 1).length;
+  const { habits, entries, recordProgress, profile } = useHabitly();
+  const now = new Date();
+  const today = toDateKey(now);
+  const dayHabits = habits.filter(habit => isHabitScheduled(habit, today));
+  const complete = dayHabits.filter(habit => getEntryProgress(habit, entries.find(entry => entry.habitId === habit.id && entry.date === today)) === 1).length;
   const completion = dayHabits.length ? Math.round((complete / dayHabits.length) * 100) : 0;
-  const greeting = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening';
-  const currentDate = new Intl.DateTimeFormat('en', { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date());
+  const greeting = now.getHours() < 12 ? 'Good morning' : now.getHours() < 17 ? 'Good afternoon' : 'Good evening';
+  const currentDate = new Intl.DateTimeFormat('en', { weekday: 'long', month: 'long', day: 'numeric' }).format(now);
+  const weekDays = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (now.getDay() || 7) + 1 + index, 12);
+    const key = toDateKey(date);
+    const scheduled = habits.filter(habit => isHabitScheduled(habit, key));
+    const done = scheduled.filter(habit => getEntryProgress(habit, entries.find(entry => entry.habitId === habit.id && entry.date === key)) === 1).length;
+    return { key, date, rate: scheduled.length ? Math.round(done / scheduled.length * 100) : 0, scheduled: scheduled.length, future: key > today };
+  });
 
   return <>
-    <PageIntro eyebrow={currentDate} title={`${greeting}, ${demoProfile.name.split(' ')[0]}.`} description="A few small promises to yourself, kept one day at a time." action={<Link className="text-link" to="/habits"><span>Shape your routine</span><ArrowRight size={16} /></Link>} />
+    <PageIntro eyebrow={currentDate} title={profile ? `${greeting}, ${profile.displayName.split(' ')[0]}.` : `${greeting}.`} description="A few small promises to yourself, kept one day at a time." action={<Link className="text-link" to="/habits"><span>Shape your routine</span><ArrowRight size={16} /></Link>} />
     <section className="today-layout" aria-labelledby="today-title">
       <div className="today-main">
         <div className="section-heading"><div><p className="eyebrow">YOUR DAILY PRACTICE</p><h2 id="today-title">Today, in its own time</h2></div><span className="count-label">{complete} <span>of</span> {dayHabits.length} complete</span></div>
         <div className="daily-list">{dayHabits.map((habit, index) => {
-          const entry = entries.find(e => e.habitId === habit.id && e.date === today);
+          const entry = entries.find(item => item.habitId === habit.id && item.date === today);
           const progress = getEntryProgress(habit, entry) ?? 0;
           const done = progress >= 1;
           return <article className={`daily-row${done ? ' is-done' : ''}`} key={habit.id}>
@@ -37,13 +44,13 @@ export function OverviewPage() {
         <section className="consistency-panel" aria-label="Today's progress">
           <div className="consistency-top"><span className="eyebrow">A MOMENTUM CHECK</span><ArrowUpRight size={16} /></div>
           <div className="progress-ring-wrap"><svg viewBox="0 0 120 120" className="progress-ring" role="img" aria-label={`${completion}% of today's scheduled habits complete`}><circle cx="60" cy="60" r="48" className="ring-track" /><circle cx="60" cy="60" r="48" className="ring-value" style={{ strokeDasharray: `${completion * 3.016} 302` }} /></svg><div className="ring-label"><strong>{completion}<small>%</small></strong><span>of today</span></div></div>
-          <p className="consistency-message">{completion === 100 ? 'You showed up for yourself.' : complete > 0 ? 'Good things are taking shape.' : 'There is time for a beginning.'}</p>
+          <p className="consistency-message">{completion === 100 && dayHabits.length > 0 ? 'You showed up for yourself.' : complete > 0 ? 'Good things are taking shape.' : 'There is time for a beginning.'}</p>
           <span className="panel-rule" />
           <div className="panel-foot"><span>Today's practice</span><strong>{complete} <small>/ {dayHabits.length}</small></strong></div>
         </section>
         <section className="note-panel"><div className="note-top"><span className="eyebrow">A THOUGHT TO KEEP</span><Sparkles size={15} /></div><blockquote>“The secret of getting ahead is getting started.”</blockquote><cite>Mark Twain</cite><span className="note-ornament" aria-hidden="true">✳</span></section>
       </aside>
     </section>
-    <section className="overview-lower"><div className="week-summary"><div className="section-heading compact"><div><p className="eyebrow">A WIDER VIEW</p><h2>This week, so far</h2></div><Link to="/analytics" className="text-link">Your insights <ArrowRight size={15} /></Link></div><div className="week-bars" aria-label="Weekly habit completion"><span className="week-day"><i style={{ height: '56%' }} /><small>M</small></span><span className="week-day"><i style={{ height: '78%' }} /><small>T</small></span><span className="week-day"><i style={{ height: '40%' }} /><small>W</small></span><span className="week-day"><i style={{ height: '92%' }} /><small>T</small></span><span className="week-day today"><i style={{ height: `${Math.max(12, completion)}%` }} /><small>F</small></span><span className="week-day future"><i style={{ height: '8%' }} /><small>S</small></span><span className="week-day future"><i style={{ height: '8%' }} /><small>S</small></span></div><div className="week-legend"><span><i /> Completed days</span><span>This is a rhythm, not a score.</span></div></div><Link className="add-habit-prompt" to="/habits"><span className="add-prompt-icon"><Plus size={19} /></span><span><strong>Make room for a new ritual</strong><small>Start with something small and specific.</small></span><ArrowRight size={17} /></Link></section>
+    <section className="overview-lower"><div className="week-summary"><div className="section-heading compact"><div><p className="eyebrow">A WIDER VIEW</p><h2>This week, so far</h2></div><Link to="/analytics" className="text-link">Your insights <ArrowRight size={15} /></Link></div><div className="week-bars" aria-label="Weekly habit completion">{weekDays.map(day => <span className={`week-day${day.key === today ? ' today' : ''}${day.future ? ' future' : ''}`} key={day.key}><i style={{ height: day.future ? '0%' : `${day.scheduled ? Math.max(day.rate, 4) : 0}%` }} /><small>{new Intl.DateTimeFormat('en', { weekday: 'narrow' }).format(day.date)}</small></span>)}</div><div className="week-legend"><span><i /> Completed scheduled habits</span><span>Based on your recorded progress.</span></div></div><Link className="add-habit-prompt" to="/habits"><span className="add-prompt-icon"><Plus size={19} /></span><span><strong>Make room for a new ritual</strong><small>Start with something small and specific.</small></span><ArrowRight size={17} /></Link></section>
   </>;
 }

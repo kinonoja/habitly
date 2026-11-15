@@ -1,21 +1,46 @@
-import { useEffect, useMemo, useState, type PropsWithChildren } from 'react';
-import type { Habit, HabitEntry, ThemePreference } from '../../domain/habits/types';
-import { demoEntries, demoHabits } from '../../domain/habits/demo';
+import { useCallback, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
+import type { WorkspaceSnapshot } from '../../domain/habits/repositories';
+import type { Habit, HabitCompletion, ThemePreference, UserId } from '../../domain/habits/types';
 import { toDateKey } from '../../domain/dates/calendar';
+import { WorkspaceActions } from '../../application/workspace/WorkspaceActions';
+import { InMemoryHabitlyRepositories } from '../../infrastructure/persistence/memory/InMemoryHabitlyRepositories';
+import { BrowserThemePreferenceStore } from '../../infrastructure/preferences/ThemePreferenceStore';
 import { HabitlyContext, type HabitlyContextValue } from './HabitlyContext';
 
-function initialTheme(): ThemePreference {
-  try {
-    const stored = localStorage.getItem('habitly-theme');
-    if (stored === 'light' || stored === 'dark' || stored === 'system') return stored;
-  } catch { /* Local storage can be disabled. */ }
-  return 'system';
+interface AppProvidersProps extends PropsWithChildren {
+  initialWorkspace?: WorkspaceSnapshot;
+  isDemoPreview?: boolean;
 }
 
-export function AppProviders({ children }: PropsWithChildren) {
-  const [theme, setThemeState] = useState<ThemePreference>(initialTheme);
-  const [habits, setHabits] = useState<Habit[]>(demoHabits);
-  const [entries, setEntries] = useState<HabitEntry[]>(demoEntries);
+const themeStore = new BrowserThemePreferenceStore();
+
+function createLocalOwnerId(): UserId {
+  return `local-workspace:${crypto.randomUUID()}`;
+}
+
+export function AppProviders({ children, initialWorkspace, isDemoPreview = false }: AppProvidersProps) {
+  const [theme, setThemeState] = useState<ThemePreference>(() => themeStore.read());
+  const [workspaceServices] = useState(() => {
+    const ownerId = initialWorkspace?.profile?.id ?? initialWorkspace?.habits[0]?.ownerId ?? createLocalOwnerId();
+    const memory = new InMemoryHabitlyRepositories(initialWorkspace);
+    const repositories = memory.getRepositories();
+    return { ownerId, repositories, actions: new WorkspaceActions(ownerId, repositories) };
+  });
+  const { ownerId, actions } = workspaceServices;
+  const [habits, setHabits] = useState<Habit[]>(() => initialWorkspace?.habits ?? []);
+  const [entries, setEntries] = useState<HabitCompletion[]>(() => initialWorkspace?.completions ?? []);
+
+  const refreshWorkspace = useCallback(async () => {
+    const workspace = await actions.load();
+    setHabits(workspace.habits);
+    setEntries(workspace.completions);
+  }, [actions]);
+
+  const runAction = useCallback((operation: () => Promise<unknown>) => {
+    void operation().then(refreshWorkspace).catch(error => {
+      console.error('The in-memory workspace could not be updated.', error);
+    });
+  }, [refreshWorkspace]);
 
   useEffect(() => {
     const applyTheme = () => {
@@ -35,33 +60,21 @@ export function AppProviders({ children }: PropsWithChildren) {
 
   const value = useMemo<HabitlyContextValue>(() => ({
     theme,
-    setTheme: next => {
-      setThemeState(next);
-      try { localStorage.setItem('habitly-theme', next); } catch { /* Theme still works for this session. */ }
+    setTheme: next => { setThemeState(next); themeStore.write(next); },
+    ownerId,
+    profile: initialWorkspace?.profile,
+    isDemoPreview,
+    habits,
+    entries,
+    addHabit: draft => runAction(() => actions.saveHabit(draft)),
+    updateHabit: draft => {
+      const current = habits.find(habit => habit.id === draft.id);
+      if (current) runAction(() => actions.saveHabit(draft, current));
     },
-    habits, entries,
-    addHabit: habit => setHabits(current => [...current, habit]),
-    updateHabit: updated => setHabits(current => current.map(item => item.id === updated.id ? updated : item)),
-    setHabitStatus: (id, status) => setHabits(current => current.map(item => item.id === id ? { ...item, status } : item)),
-    recordProgress: (habit, value) => {
-      const date = toDateKey(new Date());
-      setEntries(current => {
-        const updated = habit.trackingType === 'binary'
-          ? { habitId: habit.id, date, completion: current.find(e => e.habitId === habit.id && e.date === date)?.completion === 'complete' ? 'incomplete' as const : 'complete' as const }
-          : { habitId: habit.id, date, value: value ?? habit.targetValue ?? 0, completion: (value ?? habit.targetValue ?? 0) >= (habit.targetValue ?? Infinity) ? 'complete' as const : 'partial' as const };
-        const rest = current.filter(entry => !(entry.habitId === habit.id && entry.date === date));
-        return [...rest, updated];
-      });
-    },
-    recordAtDate: (habit, date, value) => {
-      setEntries(current => {
-        const updated: HabitEntry = habit.trackingType === 'binary'
-          ? { habitId: habit.id, date, completion: value ? 'complete' : 'incomplete' }
-          : { habitId: habit.id, date, value: Number(value), completion: Number(value) >= (habit.targetValue ?? Infinity) ? 'complete' : Number(value) > 0 ? 'partial' : 'incomplete' };
-        return [...current.filter(entry => !(entry.habitId === habit.id && entry.date === date)), updated];
-      });
-    },
-  }), [theme, habits, entries]);
+    setHabitStatus: (id, status) => runAction(() => actions.setHabitStatus(id, status)),
+    recordProgress: (habit, amount) => runAction(() => actions.toggleToday(habit, toDateKey(new Date()), amount)),
+    recordAtDate: (habit, date, amount) => runAction(() => actions.recordAtDate(habit, date, amount)),
+  }), [theme, ownerId, initialWorkspace?.profile, isDemoPreview, habits, entries, actions, runAction]);
 
   return <HabitlyContext.Provider value={value}>{children}</HabitlyContext.Provider>;
 }

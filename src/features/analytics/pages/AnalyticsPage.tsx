@@ -37,6 +37,11 @@ export function AnalyticsPage() {
   });
   const monthLabel = new Intl.DateTimeFormat('en', { month: 'long' }).format(new Date());
 
+  if (!habits.length) return <>
+    <PageIntro eyebrow="PATTERNS, NOT PRESSURE" title="Your insights" description="A thoughtful look at the rhythm you are building." action={<span className="date-range-label"><CalendarRange size={16} /> {monthLabel} to date</span>} />
+    <section className="analytics-panel empty-state"><h3>Your story is still unfolding</h3><p>Once you add a habit and record progress, your insights will appear here.</p></section>
+  </>;
+
   return <>
     <PageIntro eyebrow="PATTERNS, NOT PRESSURE" title="Your insights" description="A thoughtful look at the rhythm you are building." action={<span className="date-range-label"><CalendarRange size={16} /> {monthLabel} to date</span>} />
     <div className="analytics-metrics"><Metric label="Consistency this month" value={`${totals.rate}%`} note={`${totals.completed} of ${totals.expected} scheduled practices`} icon={<Sparkles size={16} />} /><Metric label="Active practices" value={String(active.length).padStart(2, '0')} note="Habits currently in your routine" icon={<Info size={16} />} /><Metric label="Current best streak" value={`${getStreak(active, entries, today)} days`} note="Consecutive days with a completed habit" icon={<Flame size={16} />} /></div>

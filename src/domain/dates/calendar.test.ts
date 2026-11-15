@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { daysInMonth, getEntryProgress, isExpectedCompletion, isHabitScheduled, parseDateInput, shiftMonth, toDateKey, weeklyScheduleDays } from './calendar';
+import { calendarWeekStart, daysInMonth, getEntryProgress, isExpectedCompletion, isHabitScheduled, parseDateInput, shiftMonth, toDateKey } from './calendar';
 import type { Habit, HabitEntry } from '../habits/types';
 
 const habit: Habit = {
-  id: 'reading', name: 'Read', description: '', category: 'Learning', trackingType: 'measurable',
+  id: 'reading', ownerId: 'test-owner', name: 'Read', description: '', category: 'Learning', trackingType: 'measurable',
   targetValue: 20, unit: 'pages', schedule: { type: 'weekdays', days: [1, 3, 5] },
-  startDate: '2024-02-05', endDate: '2024-02-23', status: 'active', createdAt: '2024-02-01T10:00:00.000Z',
+  startDate: '2024-02-05', endDate: '2024-02-23', status: 'active', createdAt: '2024-02-01T10:00:00.000Z', updatedAt: '2024-02-01T10:00:00.000Z', revision: 0,
 };
 
 describe('calendar date utilities', () => {
@@ -19,6 +19,12 @@ describe('calendar date utilities', () => {
   it('moves between months and years without losing the month index', () => {
     expect(shiftMonth(2025, 11, 1)).toEqual({ year: 2026, monthIndex: 0 });
     expect(shiftMonth(2025, 0, -1)).toEqual({ year: 2024, monthIndex: 11 });
+  });
+
+  it('uses Monday-start calendar weeks and handles year boundaries', () => {
+    expect(calendarWeekStart('2024-02-07')).toBe('2024-02-05');
+    expect(calendarWeekStart('2024-01-01')).toBe('2024-01-01');
+    expect(calendarWeekStart('2023-12-31')).toBe('2023-12-25');
   });
 
   it('uses local calendar dates without UTC string shifting', () => {
@@ -54,13 +60,14 @@ describe('habit schedule and entry rules', () => {
     expect(isExpectedCompletion(habit, '2024-02-21', '2024-02-20')).toBe(false);
   });
 
-  it('spreads a flexible weekly schedule across the week', () => {
-    expect(weeklyScheduleDays(3)).toEqual([1, 3, 5]);
-    expect(weeklyScheduleDays(7)).toHaveLength(7);
+  it('treats weekly targets as eligible on any calendar day instead of fixed weekdays', () => {
+    const weekly = { ...habit, schedule: { type: 'weekly' as const, timesPerWeek: 4 } };
+    expect(isHabitScheduled(weekly, '2024-02-05')).toBe(true);
+    expect(isHabitScheduled(weekly, '2024-02-06')).toBe(true);
   });
 
   it('evaluates measurable progress against the configured target', () => {
-    const entry: HabitEntry = { habitId: 'reading', date: '2024-02-05', completion: 'partial', value: 10 };
+    const entry: HabitEntry = { id: 'entry-1', ownerId: 'test-owner', habitId: 'reading', date: '2024-02-05', completion: 'partial', value: 10, createdAt: '2024-02-05T10:00:00.000Z', updatedAt: '2024-02-05T10:00:00.000Z', revision: 0 };
     expect(getEntryProgress(habit, entry)).toBe(0.5);
     expect(getEntryProgress(habit, { ...entry, value: 30 })).toBe(1);
     expect(getEntryProgress(habit)).toBeNull();

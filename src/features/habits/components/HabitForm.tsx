@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { X } from 'lucide-react';
-import type { Habit, HabitCategory, HabitSchedule, TrackingType } from '../../../domain/habits/types';
+import type { Habit, HabitCategory, HabitDraft, HabitScheduleDefinition, TrackingType } from '../../../domain/habits/types';
 import { parseDateInput, toDateKey } from '../../../domain/dates/calendar';
 import { Button } from '../../../components/ui/Button';
 
-interface HabitFormProps { habit?: Habit; onSave: (habit: Habit) => void; onClose: () => void }
+interface HabitFormProps { habit?: Habit; onSave: (habit: HabitDraft) => void; onClose: () => void }
 const categories: HabitCategory[] = ['Wellbeing', 'Learning', 'Movement', 'Mindfulness', 'Personal'];
-const weekdays = [{ label: 'M', day: 1 }, { label: 'T', day: 2 }, { label: 'W', day: 3 }, { label: 'T', day: 4 }, { label: 'F', day: 5 }, { label: 'S', day: 6 }, { label: 'S', day: 0 }];
+const weekdays = [{ label: 'M', day: 1 }, { label: 'T', day: 2 }, { label: 'W', day: 3 }, { label: 'T', day: 4 }, { label: 'F', day: 5 }, { label: 'S', day: 6 }, { label: 'S', day: 7 }];
 
 export function HabitForm({ habit, onSave, onClose }: HabitFormProps) {
   const [name, setName] = useState(habit?.name ?? '');
@@ -15,7 +15,7 @@ export function HabitForm({ habit, onSave, onClose }: HabitFormProps) {
   const [trackingType, setTrackingType] = useState<TrackingType>(habit?.trackingType ?? 'binary');
   const [target, setTarget] = useState(String(habit?.targetValue ?? ''));
   const [unit, setUnit] = useState(habit?.unit ?? '');
-  const [scheduleType, setScheduleType] = useState<HabitSchedule['type']>(habit?.schedule.type ?? 'daily');
+  const [scheduleType, setScheduleType] = useState<HabitScheduleDefinition['type']>(habit?.schedule.type ?? 'daily');
   const [selectedDays, setSelectedDays] = useState<number[]>(habit?.schedule.type === 'weekdays' ? habit.schedule.days : [1, 2, 3, 4, 5]);
   const [weeklyCount, setWeeklyCount] = useState(habit?.schedule.type === 'weekly' ? habit.schedule.timesPerWeek : 3);
   const [startDate, setStartDate] = useState(habit?.startDate ?? toDateKey(new Date()));
@@ -45,8 +45,8 @@ export function HabitForm({ habit, onSave, onClose }: HabitFormProps) {
     if (parsedEndDate && parsedEndDate < startDate) { setError('The end date must be on or after the start date.'); return; }
     if (trackingType === 'measurable' && (!Number.isFinite(parsedTarget) || parsedTarget <= 0 || !unit.trim())) { setError('Add a target above zero and a unit of measure.'); return; }
     if (scheduleType === 'weekdays' && selectedDays.length === 0) { setError('Choose at least one day.'); return; }
-    const schedule: HabitSchedule = scheduleType === 'daily' ? { type: 'daily' } : scheduleType === 'weekly' ? { type: 'weekly', timesPerWeek: weeklyCount } : { type: 'weekdays', days: selectedDays };
-    onSave({ id: habit?.id ?? `habit-${crypto.randomUUID()}`, name: name.trim(), description: description.trim(), category, trackingType, targetValue: trackingType === 'measurable' ? parsedTarget : undefined, unit: trackingType === 'measurable' ? unit.trim() : undefined, schedule, startDate, endDate: parsedEndDate, status: habit?.status ?? 'active', createdAt: habit?.createdAt ?? new Date().toISOString() });
+    const schedule: HabitScheduleDefinition = scheduleType === 'daily' ? { type: 'daily' } : scheduleType === 'weekly' ? { type: 'weekly', timesPerWeek: weeklyCount } : { type: 'weekdays', days: selectedDays };
+    onSave({ id: habit?.id, name: name.trim(), description: description.trim(), category, trackingType, targetValue: trackingType === 'measurable' ? parsedTarget : undefined, unit: trackingType === 'measurable' ? unit.trim() : undefined, schedule, startDate, endDate: parsedEndDate, status: habit?.status ?? 'active' });
   };
 
   return <div className="modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}><section ref={dialogRef} className="habit-modal" role="dialog" aria-modal="true" aria-labelledby="habit-form-title"><div className="modal-head"><div><p className="eyebrow">A NEW PRACTICE</p><h2 id="habit-form-title">{habit ? 'Refine your habit' : 'Begin with one small thing'}</h2></div><button type="button" className="icon-button" onClick={onClose} aria-label="Close form"><X size={20} /></button></div><form onSubmit={submit}>
